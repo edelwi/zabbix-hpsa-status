@@ -1,28 +1,37 @@
 #!/bin/env python3
-# Получение статуса RAID массивов, утилитой hpssacli. Требуются root привилегии.
-# в стиле функционального ядра. по мотивам https://m.habr.com/ru/post/555370/
-import subprocess
-import re
+
 import os
+import re
+import subprocess
 import unicodedata
 
-LLD_JSON_PATH = '/home/hpsa_zabbix'
-LLD_METRICS_PATH = '/home/hpsa_zabbix/data'
+LLD_JSON_PATH = '/var/local/hpsa_zabbix'
+LLD_METRICS_PATH = '/var/local/hpsa_zabbix/metrics'
+LLD_CONTROLLERS = 'controllers.json'
+LLD_ARRAYS = 'arrays.json'
+LLD_DISKS = 'disks.json'
 
-# Конвейер обработки данных
+HPSSA = '/usr/sbin/hpssacli'  # full path to hpssacli
+
+ARRAY_NAME_PATT = re.compile(r'Array:\s+(?P<array_name>.+)')
+PD_NAME_PATT = re.compile(r'physicaldrive\s+(?P<pd_name>.+)$')
+
+
+# Data processing pipe.
 def pipe(data, *fseq):
-    for fn in fseq: 
+    for fn in fseq:
         data = fn(data)
     return data
+
 
 def debug(data):
     print(data)
     return data
 
-def get_hpsa_config():
-    hpsa_path = '/usr/sbin/hpssacli'
 
-    cli = [hpsa_path, 'ctrl', 'all', 'show', 'config', 'detail' ]
+def get_hpsa_config():
+    """Function for running hpssacli and get detailed output about controllers."""
+    cli = [HPSSA, 'ctrl', 'all', 'show', 'config', 'detail']
     p = subprocess.Popen(
         cli,
         stdout=subprocess.PIPE,
@@ -32,27 +41,22 @@ def get_hpsa_config():
         raise ValueError(f'hpsa call error {err}')
     return output
 
-def parse(output):
 
-    ld_status_pat = re.compile(r'logicaldrive\s+(?P<ld_num>\d{1})\s+\([1-9\.]+\s+[G|T|P]B,\s+RAID\s+(?P<raid_num>\d{1,2}),\s+(?P<ld_status>.+)\)$', re.X)
-    pd_status_pat = re.compile(r'physicaldrive\s+.+\s+\(port\s+(?P<port>.+):box\s+(?P<box>\d+):bay\s+(?P<bay>\d+),\s+(?P<interface>.+),\s+(?P<size>\d+)\s+(?P<size_suffix>[M|G|T|P]B),\s+(?P<status>.+)\)$', re.X)
+def create_dir(full_dir_path):
+    if not os.path.exists(full_dir_path):
+        os.makedirs(full_dir_path)
 
-    ld = []
-    pd = []
-    text = output.decode('utf-8').split('\n')
-    #print(output, type(output))
-    for line in text:
-        match = re.search(ld_status_pat, line)
-        #print(line, match)
-        if match:
-            ld.append(match.groupdict())
-            #print(match.groupdict())
-        match2 = re.search(pd_status_pat, line)
-        if match2:
-            pd.append(match2.groupdict())
-            #print(match2.groupdict())
-    return ld, pd
-    
+
+def remove_file(full_file_name):
+    if os.path.exists(full_file_name):
+        os.remove(full_file_name)
+
+
+def remove_all_metrics_files():
+    """Function to remove all files in LLD_METRICS_PATH directory."""
+
+    [os.remove(_) for _ in os.listdir(LLD_METRICS_PATH) if os.path.isfile(os.path.join(LLD_METRICS_PATH, _))]
+
 
 # from https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
 def clean_name(name, replace_space_with=None):
@@ -77,7 +81,7 @@ def clean_name(name, replace_space_with=None):
     return cleaned_name
 
 
-##========= from https://opendev.org/x/proliantutils/src/branch/master/proliantutils/hpssa/objects.py
+##========= cut from https://opendev.org/x/proliantutils/src/branch/master/proliantutils/hpssa/objects.py
 ## Не хотелось добавлять зависимость из-за четырёх функций. Код классный!
 
 def _get_indentation(string):
@@ -113,6 +117,7 @@ def _get_key_value(string):
             return string.strip(' '), None
 
     return key.strip(' '), value.strip(' ')
+
 
 def _get_dict(lines, start_index, indentation, deep):
     """Recursive function for parsing hpssacli/ssacli output."""
@@ -162,6 +167,7 @@ def _get_dict(lines, start_index, indentation, deep):
 
     return info, i
 
+
 def _convert_to_dict(stdout):
     """Wrapper function for parsing hpssacli/ssacli command.
     This function gets the output from hpssacli/ssacli command
@@ -172,181 +178,161 @@ def _convert_to_dict(stdout):
     lines = stdout.decode('utf-8').split("\n")
     lines = list(filter(None, lines))
     info_dict, j = _get_dict(lines, 0, 0, 0)
-    return info_dict    
-
-##==================== from https://opendev.org/x/proliantutils/src/branch/master/proliantutils/hpssa/objects.py
+    return info_dict
 
 
-def print_out(params):
-    for param in params:
-        [print(_) for _ in param]
-        
-def prety_print(info_dict, level=0):
+##==================== end cut from https://opendev.org/x/proliantutils/src/branch/master/proliantutils/hpssa/objects.py
+
+
+def pretty_print(info_dict, level=0):
+    """Recursive function for printing dictionary with hpssa detailed information."""
+
     indent = ' ' * 4
     current_level = level
-    for k,v in info_dict.items():
+    for k, v in info_dict.items():
         if isinstance(v, str) or v is None:
-            print(f"{indent*current_level}{k}: {v}")
+            print(f"{indent * current_level}{k}: {v}")
         else:
             print()
-            print(f"{indent*current_level}{k}:")
-            prety_print(v, level=current_level+1)
+            print(f"{indent * current_level}{k}:")
+            pretty_print(v, level=current_level + 1)
 
 
 def lld_discovery_controllers(data):
-    file_ = 'controllers.json'
+    """Function for create LLD json with information about controllers."""
+
+    file_ = LLD_CONTROLLERS
     discovery_file = os.path.join(LLD_JSON_PATH, file_)
-    if not os.path.exists(LLD_JSON_PATH):
-        os.makedirs(LLD_JSON_PATH)
-    if os.path.exists(discovery_file) and os.path.isfile(discovery_file):
-        # Удалим старые данные, если обнаружение сломается пусть заббикс об этом узнает
-        os.remove(discovery_file)
+    create_dir(LLD_JSON_PATH)
+    remove_file(discovery_file)
     controllers = data.keys()
-    json_start = '{"data":['
-    json_end = ']}'
     json_data = ''
     for item in controllers:
         json_data = json_data + f'{{"{{#CTRLNAME}}":"{clean_name(item)}"}},'
     json_data = json_data[:-1]
     with open(discovery_file, 'w') as fl:
-        print(f'{json_start}{json_data}{json_end}', file=fl)
+        print(f'{{"data":[{json_data}]}}', file=fl)
     return data
-    
+
+
 def lld_discovery_arrays(data):
-    arr_name_patt = re.compile(r'Array:\s+(?P<array_name>.+)')
-    file_ = 'arrays.json'
+    """Function for create LLD json with information about RAID arrays."""
+
+    file_ = LLD_ARRAYS
     discovery_file = os.path.join(LLD_JSON_PATH, file_)
-    if not os.path.exists(LLD_JSON_PATH):
-        os.makedirs(LLD_JSON_PATH)
-    if os.path.exists(discovery_file) and os.path.isfile(discovery_file):
-        # Удалим старые данные, если обнаружение сломается пусть заббикс об этом узнает
-        os.remove(discovery_file)
-    controllers = data.keys()
-    json_start = '{"data":['
-    json_end = ']}'
+    create_dir(LLD_JSON_PATH)
+    remove_file(discovery_file)
     json_data = ''
-    for conrtiller,value in data.items():
-        if isinstance(value, dict):
-            for ctrl_key, ctrl_value in value.items():
-                match = re.search(arr_name_patt, ctrl_key)
+    for ctrl, ctrl_value in data.items():
+        if isinstance(ctrl_value, dict):
+            for ar_key, ar_value in ctrl_value.items():
+                match = re.search(ARRAY_NAME_PATT, ar_key)
                 if match:
                     ar_name = match.groupdict()['array_name']
-                    json_data = json_data + f'{{"{{#CTRLNAME}}":"{clean_name(conrtiller)}","{{#ARRAYNAME}}":"{clean_name(ar_name)}"}},'
+                    json_data = json_data + f'{{"{{#CTRLNAME}}":"{clean_name(ctrl)}","' \
+                                            f'{{#ARRAYNAME}}":"{clean_name(ar_name)}"}},'
     json_data = json_data[:-1]
     with open(discovery_file, 'w') as fl:
-        print(f'{json_start}{json_data}{json_end}', file=fl)
+        print(f'{{"data":[{json_data}]}}', file=fl)
     return data
-    
+
 
 def lld_discovery_pds(data):
-    arr_name_patt = re.compile(r'Array:\s+(?P<array_name>.+)')
-    pd_name_patt = re.compile(r'physicaldrive\s+(?P<pd_name>.+)$')
-    file_ = 'disks.json'
+    """Function for create LLD json with information about RAID physical disks."""
+
+    file_ = LLD_DISKS
     discovery_file = os.path.join(LLD_JSON_PATH, file_)
-    if not os.path.exists(LLD_JSON_PATH):
-        os.makedirs(LLD_JSON_PATH)
-    if os.path.exists(discovery_file) and os.path.isfile(discovery_file):
-        # Удалим старые данные, если обнаружение сломается пусть заббикс об этом узнает
-        os.remove(discovery_file)
-    controllers = data.keys()
-    json_start = '{"data":['
-    json_end = ']}'
+    create_dir(LLD_JSON_PATH)
+    remove_file(discovery_file)
     json_data = ''
-    for conrtiller,value in data.items():
-        if isinstance(value, dict):
-            for ctrl_key, ctrl_value in value.items():
-                match = re.search(arr_name_patt, ctrl_key)
+    for ctrl, ctrl_value in data.items():
+        if isinstance(ctrl_value, dict):
+            for ar_key, ar_value in ctrl_value.items():
+                match = re.search(ARRAY_NAME_PATT, ar_key)
                 if match:
                     ar_name = match.groupdict()['array_name']
-                    for arr_key, arr_val in ctrl_value.items():
-                        match2 = re.search(pd_name_patt, arr_key)
+                    for pd_key, pd_value in ar_value.items():
+                        match2 = re.search(PD_NAME_PATT, pd_key)
                         if match2:
                             pd_name = match2.groupdict()['pd_name']
-                            json_data = json_data + f'{{"{{#CTRLNAME}}":"{clean_name(conrtiller)}","{{#ARRAYNAME}}":"{clean_name(ar_name)}","{{#PDNAME}}":"{clean_name(pd_name)}"}},'
+                            json_data = json_data + f'{{"{{#CTRLNAME}}":"{clean_name(ctrl)}","{{#ARRAYNAME}}":"' \
+                                                    f'{clean_name(ar_name)}","{{#PDNAME}}":"{clean_name(pd_name)}"}},'
     json_data = json_data[:-1]
     with open(discovery_file, 'w') as fl:
-        print(f'{json_start}{json_data}{json_end}', file=fl)
+        print(f'{{"data":[{json_data}]}}', file=fl)
     return data
 
 
 def get_ctrl_metrics(data):
-    if not os.path.exists(LLD_METRICS_PATH):
-        os.makedirs(LLD_METRICS_PATH)
-    for ctrl,ctrl_val in data.items():
-        fname = clean_name(ctrl)
-        full_fname = os.path.join(LLD_METRICS_PATH, fname)
-        if os.path.exists(full_fname) and os.path.isfile(full_fname):
-            os.remove(full_fname)
-        with open(full_fname, 'w') as fl:
-            if isinstance(ctrl_val, dict):
-                for metric,value in ctrl_val.items():
+    """Function for create controllers metrics files."""
+
+    create_dir(LLD_METRICS_PATH)
+    for ctrl, ctrl_value in data.items():
+        file_name = clean_name(ctrl)
+        full_file_name = os.path.join(LLD_METRICS_PATH, file_name)
+        with open(full_file_name, 'w') as fl:
+            if isinstance(ctrl_value, dict):
+                for metric, value in ctrl_value.items():
                     if isinstance(value, str):
                         print(f"{metric}={value}", file=fl)
     return data
 
 
 def get_array_metrics(data):
-    arr_name_patt = re.compile(r'Array:\s+(?P<array_name>.+)')
-    if not os.path.exists(LLD_METRICS_PATH):
-        os.makedirs(LLD_METRICS_PATH)
-    for conrtiller,value in data.items():
-        if isinstance(value, dict):
-            for ctrl_key, ctrl_value in value.items():
-                match = re.search(arr_name_patt, ctrl_key)
+    """Function for create RAID arrays metrics files."""
+
+    create_dir(LLD_METRICS_PATH)
+    for ctrl, ctrl_value in data.items():
+        if isinstance(ctrl_value, dict):
+            for ar_key, ar_value in ctrl_value.items():
+                match = re.search(ARRAY_NAME_PATT, ar_key)
                 if match:
                     ar_name = match.groupdict()['array_name']
-                    fname = clean_name(f"{conrtiller}__{ar_name}")
-                    full_fname = os.path.join(LLD_METRICS_PATH, fname)
-                    if os.path.exists(full_fname) and os.path.isfile(full_fname):
-                        os.remove(full_fname)
-                    with open(full_fname, 'w') as fl:
-                        if isinstance(ctrl_value, dict):
-                            for metric, value in ctrl_value.items():
+                    file_name = clean_name(f"{ctrl}__{ar_name}")
+                    full_file_name = os.path.join(LLD_METRICS_PATH, file_name)
+                    with open(full_file_name, 'w') as fl:
+                        if isinstance(ar_value, dict):
+                            for metric, value in ar_value.items():
                                 if isinstance(value, str):
                                     print(f"{metric}={value}", file=fl)
     return data
 
 
-
 def get_pd_metrics(data):
-    arr_name_patt = re.compile(r'Array:\s+(?P<array_name>.+)')
-    pd_name_patt = re.compile(r'physicaldrive\s+(?P<pd_name>.+)$')
-    if not os.path.exists(LLD_METRICS_PATH):
-        os.makedirs(LLD_METRICS_PATH)
-    for conrtiller,value in data.items():
-        if isinstance(value, dict):
-            for ctrl_key, ctrl_value in value.items():
-                match = re.search(arr_name_patt, ctrl_key)
+    """Function for create physical disks metrics files."""
+
+    create_dir(LLD_METRICS_PATH)
+    for ctrl, ctrl_value in data.items():
+        if isinstance(ctrl_value, dict):
+            for ar_key, ar_value in ctrl_value.items():
+                match = re.search(ARRAY_NAME_PATT, ar_key)
                 if match:
                     ar_name = match.groupdict()['array_name']
-                    for arr_key, arr_value in ctrl_value.items():
-                        match2 = re.search(pd_name_patt, arr_key)
+                    for pd_key, pd_value in ar_value.items():
+                        match2 = re.search(PD_NAME_PATT, pd_key)
                         if match2:
                             pd_name = match2.groupdict()['pd_name']
-                            fname = clean_name(f"{conrtiller}__{ar_name}__{pd_name}")
-                            full_fname = os.path.join(LLD_METRICS_PATH, fname)
-                            if os.path.exists(full_fname) and os.path.isfile(full_fname):
-                                os.remove(full_fname)
-                            with open(full_fname, 'w') as fl:
-                                if isinstance(arr_value, dict):
-                                    for metric, value in arr_value.items():
+                            file_name = clean_name(f"{ctrl}__{ar_name}__{pd_name}")
+                            full_file_name = os.path.join(LLD_METRICS_PATH, file_name)
+                            with open(full_file_name, 'w') as fl:
+                                if isinstance(pd_value, dict):
+                                    for metric, value in pd_value.items():
                                         if isinstance(value, str):
                                             print(f"{metric}={value}", file=fl)
     return data
 
+
 if __name__ == '__main__':
     pipe(
-        get_hpsa_config(), 
-        #parse,
+        remove_all_metrics_files(),
+        get_hpsa_config(),
         _convert_to_dict,
-        #debug,
-        #print_out,
+        # debug,
         lld_discovery_controllers,
         lld_discovery_arrays,
         lld_discovery_pds,
         get_ctrl_metrics,
         get_array_metrics,
         get_pd_metrics
-        #prety_print
-        )
-
+        # pretty_print
+    )
