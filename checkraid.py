@@ -52,10 +52,11 @@ def remove_file(full_file_name):
         os.remove(full_file_name)
 
 
-def remove_all_metrics_files():
+def remove_all_metrics_files(data):
     """Function to remove all files in LLD_METRICS_PATH directory."""
-
-    [os.remove(_) for _ in os.listdir(LLD_METRICS_PATH) if os.path.isfile(os.path.join(LLD_METRICS_PATH, _))]
+    if os.path.exists(LLD_METRICS_PATH):
+        [os.remove(os.path.join(LLD_METRICS_PATH, _)) for _ in os.listdir(LLD_METRICS_PATH) if os.path.isfile(os.path.join(LLD_METRICS_PATH, _))]
+    return data
 
 
 # from https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
@@ -324,9 +325,9 @@ def get_pd_metrics(data):
 
 if __name__ == '__main__':
     pipe(
-        remove_all_metrics_files(),
         get_hpsa_config(),
         _convert_to_dict,
+        remove_all_metrics_files,
         # debug,
         lld_discovery_controllers,
         lld_discovery_arrays,
