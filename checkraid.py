@@ -1,9 +1,10 @@
 #!/bin/env python3
 
-import os
 import re
 import subprocess
 import unicodedata
+from os import remove, listdir, makedirs
+from os.path import exists, join, isfile
 
 LLD_JSON_PATH = '/var/local/hpsa_zabbix'
 LLD_METRICS_PATH = '/var/local/hpsa_zabbix/metrics'  # Be careful all files in this directory deleted automatically.
@@ -43,19 +44,19 @@ def get_hpsa_config():
 
 
 def create_dir(full_dir_path):
-    if not os.path.exists(full_dir_path):
-        os.makedirs(full_dir_path)
+    if not exists(full_dir_path):
+        makedirs(full_dir_path)
 
 
 def remove_file(full_file_name):
-    if os.path.exists(full_file_name):
-        os.remove(full_file_name)
+    if exists(full_file_name):
+        remove(full_file_name)
 
 
 def remove_all_metrics_files(data):
     """Function to remove all files in LLD_METRICS_PATH directory."""
-    if os.path.exists(LLD_METRICS_PATH):
-        [os.remove(os.path.join(LLD_METRICS_PATH, _)) for _ in os.listdir(LLD_METRICS_PATH) if os.path.isfile(os.path.join(LLD_METRICS_PATH, _))]
+    if exists(LLD_METRICS_PATH):
+        [remove(join(LLD_METRICS_PATH, _)) for _ in listdir(LLD_METRICS_PATH) if isfile(join(LLD_METRICS_PATH, _))]
     return data
 
 
@@ -203,7 +204,7 @@ def lld_discovery_controllers(data):
     """Function for create LLD json with information about controllers."""
 
     file_ = LLD_CONTROLLERS
-    discovery_file = os.path.join(LLD_JSON_PATH, file_)
+    discovery_file = join(LLD_JSON_PATH, file_)
     create_dir(LLD_JSON_PATH)
     remove_file(discovery_file)
     controllers = data.keys()
@@ -220,7 +221,7 @@ def lld_discovery_arrays(data):
     """Function for create LLD json with information about RAID arrays."""
 
     file_ = LLD_ARRAYS
-    discovery_file = os.path.join(LLD_JSON_PATH, file_)
+    discovery_file = join(LLD_JSON_PATH, file_)
     create_dir(LLD_JSON_PATH)
     remove_file(discovery_file)
     json_data = ''
@@ -242,7 +243,7 @@ def lld_discovery_pds(data):
     """Function for create LLD json with information about RAID physical disks."""
 
     file_ = LLD_DISKS
-    discovery_file = os.path.join(LLD_JSON_PATH, file_)
+    discovery_file = join(LLD_JSON_PATH, file_)
     create_dir(LLD_JSON_PATH)
     remove_file(discovery_file)
     json_data = ''
@@ -270,7 +271,7 @@ def get_ctrl_metrics(data):
     create_dir(LLD_METRICS_PATH)
     for ctrl, ctrl_value in data.items():
         file_name = clean_name(ctrl)
-        full_file_name = os.path.join(LLD_METRICS_PATH, file_name)
+        full_file_name = join(LLD_METRICS_PATH, file_name)
         with open(full_file_name, 'w') as fl:
             if isinstance(ctrl_value, dict):
                 for metric, value in ctrl_value.items():
@@ -290,7 +291,7 @@ def get_array_metrics(data):
                 if match:
                     ar_name = match.groupdict()['array_name']
                     file_name = clean_name(f"{ctrl}__{ar_name}")
-                    full_file_name = os.path.join(LLD_METRICS_PATH, file_name)
+                    full_file_name = join(LLD_METRICS_PATH, file_name)
                     with open(full_file_name, 'w') as fl:
                         if isinstance(ar_value, dict):
                             for metric, value in ar_value.items():
@@ -314,7 +315,7 @@ def get_pd_metrics(data):
                         if match2:
                             pd_name = match2.groupdict()['pd_name']
                             file_name = clean_name(f"{ctrl}__{ar_name}__{pd_name}")
-                            full_file_name = os.path.join(LLD_METRICS_PATH, file_name)
+                            full_file_name = join(LLD_METRICS_PATH, file_name)
                             with open(full_file_name, 'w') as fl:
                                 if isinstance(pd_value, dict):
                                     for metric, value in pd_value.items():
@@ -329,7 +330,7 @@ def get_all_metrics(data):
     create_dir(LLD_METRICS_PATH)
     for ctrl, ctrl_value in data.items():
         ctrl_file_name = clean_name(ctrl)
-        ctrl_full_file_name = os.path.join(LLD_METRICS_PATH, ctrl_file_name)
+        ctrl_full_file_name = join(LLD_METRICS_PATH, ctrl_file_name)
         with open(ctrl_full_file_name, 'w') as ctrl_fl:
             if isinstance(ctrl_value, dict):
                 for ar_key, ar_value in ctrl_value.items():
@@ -337,14 +338,14 @@ def get_all_metrics(data):
                     if arr_match:
                         ar_name = arr_match.groupdict()['array_name']
                         ar_file_name = clean_name(f"{ctrl}__{ar_name}")
-                        ar_full_file_name = os.path.join(LLD_METRICS_PATH, ar_file_name)
+                        ar_full_file_name = join(LLD_METRICS_PATH, ar_file_name)
                         with open(ar_full_file_name, 'w') as ar_fl:
                             for pd_key, pd_value in ar_value.items():
                                 pd_match = re.search(PD_NAME_PATT, pd_key)
                                 if pd_match:
                                     pd_name = pd_match.groupdict()['pd_name']
                                     pd_file_name = clean_name(f"{ctrl}__{ar_name}__{pd_name}")
-                                    pd_full_file_name = os.path.join(LLD_METRICS_PATH, pd_file_name)
+                                    pd_full_file_name = join(LLD_METRICS_PATH, pd_file_name)
                                     with open(pd_full_file_name, 'w') as pd_fl:
                                         if isinstance(pd_value, dict):
                                             for metric, value in pd_value.items():
