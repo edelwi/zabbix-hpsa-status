@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>5.0</version>
+    <date>2021-05-14T06:19:03Z</date>
+    <groups>
+        <group>
+            <name>Templates</name>
+        </group>
+    </groups>
+    <templates>
+        <template>
+            <template>Template HP Smart Array Status</template>
+            <name>Template HP Smart Array Status</name>
+            <description>Discovery of existing controllers, arrays and physical disks. Getting their status and
+                metrics.
+            </description>
+            <groups>
+                <group>
+                    <name>Templates</name>
+                </group>
+            </groups>
+            <applications>
+                <application>
+                    <name>Controller {#CTRLNAME}</name>
+                </application>
+            </applications>
+            <discovery_rules>
+                <discovery_rule>
+                    <name>Discover HP SA arrays</name>
+                    <key>vfs.file.contents[/var/local/hpsa_zabbix/arrays.json]</key>
+                    <filter>
+                        <conditions>
+                            <condition>
+                                <macro>{#CTRLNAME}</macro>
+                                <value>.*</value>
+                                <formulaid>B</formulaid>
+                            </condition>
+                            <condition>
+                                <macro>{#ARRAYNAME}</macro>
+                                <value>.*</value>
+                                <formulaid>A</formulaid>
+                            </condition>
+                        </conditions>
+                    </filter>
+                    <description>Obtaining available HP SA arrays.</description>
+                    <item_prototypes>
+                        <item_prototype>
+                            <name>Array {#ARRAYNAME} Interface Type (controller {#CTRLNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME},&quot;Interface
+                                Type=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Array Interface Type</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Array {#ARRAYNAME} Status (controller {#CTRLNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME},&quot;Status=(.*)$&quot;,,,,\1]</key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Array status.</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last(#3)}&lt;&gt;&quot;OK&quot;</expression>
+                                    <name>Array {#ARRAYNAME} Status Alarm (controller {#CTRLNAME} on {HOST.NAME})</name>
+                                    <priority>WARNING</priority>
+                                    <description>Array status is not OK.</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                    </item_prototypes>
+                </discovery_rule>
+                <discovery_rule>
+                    <name>Discover HP SA controllers</name>
+                    <key>vfs.file.contents[/var/local/hpsa_zabbix/controllers.json]</key>
+                    <filter>
+                        <conditions>
+                            <condition>
+                                <macro>{#CTRLNAME}</macro>
+                                <value>.*</value>
+                                <formulaid>A</formulaid>
+                            </condition>
+                        </conditions>
+                    </filter>
+                    <description>Obtaining available HP SA controllers.</description>
+                    <item_prototypes>
+                        <item_prototype>
+                            <name>Battery/Capacitor {#CTRLNAME} Status</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Battery\/Capacitor
+                                Status=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Battery/Capacitor Status</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last()}&lt;&gt;&quot;OK&quot;</expression>
+                                    <name>Controller {#CTRLNAME} Battery/Capacitor Status Alarm on {HOST.NAME}</name>
+                                    <priority>WARNING</priority>
+                                    <description>Controller Battery/Capacitor Status is not OK.</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Controller {#CTRLNAME} Cache Module Temperature</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Cache Module
+                                Temperature \(C\)=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <units>C</units>
+                            <description>Cache Module Temperature (C)</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last(#3)}&gt;65</expression>
+                                    <recovery_mode>RECOVERY_EXPRESSION</recovery_mode>
+                                    <recovery_expression>{last()}&lt;60</recovery_expression>
+                                    <name>Controller {#CTRLNAME} Cache Module Temperature Warning on {HOST.NAME}</name>
+                                    <priority>WARNING</priority>
+                                    <description>Controller Cache Module Temperature Warning</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Cache {#CTRLNAME} Status</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Cache Status=(.*)$&quot;,,,,\1]</key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Cache Status</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last()}&lt;&gt;&quot;OK&quot;</expression>
+                                    <name>Controller {#CTRLNAME} Cache Status Alarm on {HOST.NAME}</name>
+                                    <priority>WARNING</priority>
+                                    <description>Controller Cache Status is not OK.</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Controller {#CTRLNAME} Status</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Controller
+                                Status=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Controller Status</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last()}&lt;&gt;&quot;OK&quot;</expression>
+                                    <name>Controller {#CTRLNAME} Status Alarm on {HOST.NAME}</name>
+                                    <priority>AVERAGE</priority>
+                                    <description>Controller Status is not OK.</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Controller {#CTRLNAME} Temperature</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Controller Temperature
+                                \(C\)=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <units>C</units>
+                            <description>Controller Temperature (C)</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last(#3)}&gt;80</expression>
+                                    <recovery_mode>RECOVERY_EXPRESSION</recovery_mode>
+                                    <recovery_expression>{last()}&lt;77</recovery_expression>
+                                    <name>Controller {#CTRLNAME} Temperature Warning on {HOST.NAME}</name>
+                                    <priority>WARNING</priority>
+                                    <description>Controller Temperature Warning</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Controller {#CTRLNAME} Serial Number</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Serial Number=(.*)$&quot;,,,,\1]</key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Serial Number</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                    </item_prototypes>
+                    <graph_prototypes>
+                        <graph_prototype>
+                            <name>Controller {#CTRLNAME} and Cache Module Temperature</name>
+                            <graph_items>
+                                <graph_item>
+                                    <sortorder>1</sortorder>
+                                    <color>1A7C11</color>
+                                    <item>
+                                        <host>Template HP Smart Array Status</host>
+                                        <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Cache
+                                            Module Temperature \(C\)=(.*)$&quot;,,,,\1]
+                                        </key>
+                                    </item>
+                                </graph_item>
+                                <graph_item>
+                                    <sortorder>2</sortorder>
+                                    <color>F63100</color>
+                                    <item>
+                                        <host>Template HP Smart Array Status</host>
+                                        <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME},&quot;Controller
+                                            Temperature \(C\)=(.*)$&quot;,,,,\1]
+                                        </key>
+                                    </item>
+                                </graph_item>
+                            </graph_items>
+                        </graph_prototype>
+                    </graph_prototypes>
+                </discovery_rule>
+                <discovery_rule>
+                    <name>Discover HP SA physical disks</name>
+                    <key>vfs.file.contents[/var/local/hpsa_zabbix/disks.json]</key>
+                    <filter>
+                        <conditions>
+                            <condition>
+                                <macro>{#CTRLNAME}</macro>
+                                <value>.*</value>
+                                <formulaid>B</formulaid>
+                            </condition>
+                            <condition>
+                                <macro>{#ARRAYNAME}</macro>
+                                <value>.*</value>
+                                <formulaid>A</formulaid>
+                            </condition>
+                            <condition>
+                                <macro>{#PDNAME}</macro>
+                                <value>.*</value>
+                                <formulaid>C</formulaid>
+                            </condition>
+                        </conditions>
+                    </filter>
+                    <description>Obtaining available HP SA physical disks.</description>
+                    <item_prototypes>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Temperature (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Current
+                                Temperature \(C\)=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <units>C</units>
+                            <description>Physical disk Current Temperature (C)</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last(#3)}&gt;60</expression>
+                                    <recovery_mode>RECOVERY_EXPRESSION</recovery_mode>
+                                    <recovery_expression>{last()}&lt;55</recovery_expression>
+                                    <name>Disk {#PDNAME} Temperature Warning (ctrl: {#CTRLNAME}, array: {#ARRAYNAME} on
+                                        {HOST.NAME})
+                                    </name>
+                                    <priority>WARNING</priority>
+                                    <description>Physical disk temperature warning.</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Firmware Revision (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Firmware
+                                Revision=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Physical disk Firmware Revision</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Interface Type (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Interface
+                                Type=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Physical disk Interface Type</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Model (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Model=(.*)$&quot;,,,,\1]</key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Physical disk Model</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Rotational Speed (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Rotational
+                                Speed=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <units>rpm</units>
+                            <description>Physical disk Rotational Speed</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Serial Number (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Serial
+                                Number=(.*)$&quot;,,,,\1]
+                            </key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Physical disk Serial Number</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Size (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Size=(.*)$&quot;,,,,\1]</key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Physical disk Size</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Disk {#PDNAME} Status (ctrl: {#CTRLNAME}, array: {#ARRAYNAME})</name>
+                            <key>vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Status=(.*)$&quot;,,,,\1]</key>
+                            <history>1w</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <description>Physical disk status</description>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Controller {#CTRLNAME} - Array {#ARRAYNAME} - Disk {#PDNAME}</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last(#3)}&lt;&gt;&quot;OK&quot;</expression>
+                                    <name>Disk {#PDNAME} Status Alarm (ctrl: {#CTRLNAME}, array: {#ARRAYNAME} on
+                                        {HOST.NAME})
+                                    </name>
+                                    <priority>AVERAGE</priority>
+                                    <description>Physical disk status is not OK.</description>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                    </item_prototypes>
+                    <graph_prototypes>
+                        <graph_prototype>
+                            <name>Disk {#PDNAME} Temperature (ctrl: {#CTRLNAME}, array: {#ARRAYNAME} on {HOST.NAME})
+                            </name>
+                            <graph_items>
+                                <graph_item>
+                                    <sortorder>1</sortorder>
+                                    <color>1A7C11</color>
+                                    <item>
+                                        <host>Template HP Smart Array Status</host>
+                                        <key>
+                                            vfs.file.regexp[/var/local/hpsa_zabbix/metrics/{#CTRLNAME}__{#ARRAYNAME}__{#PDNAME},&quot;Current
+                                            Temperature \(C\)=(.*)$&quot;,,,,\1]
+                                        </key>
+                                    </item>
+                                </graph_item>
+                            </graph_items>
+                        </graph_prototype>
+                    </graph_prototypes>
+                </discovery_rule>
+            </discovery_rules>
+        </template>
+    </templates>
+</zabbix_export>

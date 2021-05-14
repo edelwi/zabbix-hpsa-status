@@ -6,7 +6,7 @@ import subprocess
 import unicodedata
 
 LLD_JSON_PATH = '/var/local/hpsa_zabbix'
-LLD_METRICS_PATH = '/var/local/hpsa_zabbix/metrics'
+LLD_METRICS_PATH = '/var/local/hpsa_zabbix/metrics'  # Be careful all files in this directory deleted automatically.
 LLD_CONTROLLERS = 'controllers.json'
 LLD_ARRAYS = 'arrays.json'
 LLD_DISKS = 'disks.json'
@@ -83,7 +83,7 @@ def clean_name(name, replace_space_with=None):
 
 
 ##========= cut from https://opendev.org/x/proliantutils/src/branch/master/proliantutils/hpssa/objects.py
-## Не хотелось добавлять зависимость из-за четырёх функций. Код классный!
+## Не хотелось добавлять зависимость из-за четырёх приватных функций. Код классный!
 
 def _get_indentation(string):
     """Return the number of spaces before the current line."""
@@ -320,6 +320,40 @@ def get_pd_metrics(data):
                                     for metric, value in pd_value.items():
                                         if isinstance(value, str):
                                             print(f"{metric}={value}", file=fl)
+    return data
+
+
+def get_all_metrics(data):
+    """Function for create all (controllers, arrays and disks) metrics files."""
+
+    create_dir(LLD_METRICS_PATH)
+    for ctrl, ctrl_value in data.items():
+        ctrl_file_name = clean_name(ctrl)
+        ctrl_full_file_name = os.path.join(LLD_METRICS_PATH, ctrl_file_name)
+        with open(ctrl_full_file_name, 'w') as ctrl_fl:
+            if isinstance(ctrl_value, dict):
+                for ar_key, ar_value in ctrl_value.items():
+                    arr_match = re.search(ARRAY_NAME_PATT, ar_key)
+                    if arr_match:
+                        ar_name = arr_match.groupdict()['array_name']
+                        ar_file_name = clean_name(f"{ctrl}__{ar_name}")
+                        ar_full_file_name = os.path.join(LLD_METRICS_PATH, ar_file_name)
+                        with open(ar_full_file_name, 'w') as ar_fl:
+                            for pd_key, pd_value in ar_value.items():
+                                pd_match = re.search(PD_NAME_PATT, pd_key)
+                                if pd_match:
+                                    pd_name = pd_match.groupdict()['pd_name']
+                                    pd_file_name = clean_name(f"{ctrl}__{ar_name}__{pd_name}")
+                                    pd_full_file_name = os.path.join(LLD_METRICS_PATH, pd_file_name)
+                                    with open(pd_full_file_name, 'w') as pd_fl:
+                                        if isinstance(pd_value, dict):
+                                            for metric, value in pd_value.items():
+                                                if isinstance(value, str):
+                                                    print(f"{metric}={value}", file=pd_fl)
+                                if isinstance(pd_value, str):
+                                    print(f"{pd_key}={pd_value}", file=ar_fl)
+                    if isinstance(ar_value, str):
+                        print(f"{ar_key}={ar_value}", file=ctrl_fl)
     return data
 
 
