@@ -366,8 +366,9 @@ if __name__ == '__main__':
         lld_discovery_controllers,
         lld_discovery_arrays,
         lld_discovery_pds,
-        get_ctrl_metrics,
-        get_array_metrics,
-        get_pd_metrics
+        #get_ctrl_metrics,
+        #get_array_metrics,
+        #get_pd_metrics
+        get_all_metrics
         # pretty_print
     )
